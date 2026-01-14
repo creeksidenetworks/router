@@ -71,11 +71,7 @@ echo "  ${VENV_DIR}/bin/python router.py <hostname> [options]"
 echo ""
 
 # Optionally activate the environment
-read -p "Activate the virtual environment now? (y/n) " -n 1 -r
+echo "Activate the virtual environment by running the following command:"
 echo ""
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    source "${VENV_DIR}/bin/activate"
-    echo "Virtual environment activated!"
-    echo "Python executable: $(which python)"
-    python --version
-fi
+echo "source ${VENV_DIR}/bin/activate"
+

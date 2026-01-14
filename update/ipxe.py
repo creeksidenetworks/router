@@ -13,7 +13,7 @@
 # included in all copies or substantial portions of the Software.
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OFZ
 # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
 # NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 # LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
@@ -58,6 +58,7 @@ def enable_ipxe(updates, router_config, router, streamlined=False):
     
     # Configure DNS forwarding options for iPXE
     ipxe_options = [
+        "options enable-tftp",
         "tftp-root=/config/user-data/tftproot",
         "dhcp-match=set:bios,60,PXEClient:Arch:00000",
         "dhcp-boot=tag:bios,undionly.kpxe",
