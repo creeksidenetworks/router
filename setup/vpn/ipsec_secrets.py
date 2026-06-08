@@ -24,7 +24,7 @@ import  os
 import json
 
 DEFAULT_IPSEC_SECRETS = f"""
-: RSA "/config/ipsec.d/certs/server.key"
+: RSA "/config/ipsec.d/rsa-keys/localhost.key"
 """
 
 class IPSecSecrets:

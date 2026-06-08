@@ -94,6 +94,7 @@ class VyattaRouter:
         while True:
             try:                
                 # If password is provided, use it; otherwise, try to connect using keys or other methods.
+                _legacy_algos = {"pubkeys": ["ssh-rsa"], "keys": ["ssh-rsa"]}
                 if self.password:
                     #print (f"{self.dnsname} | {self.username} | {self.password} | {self.port}")
                     self.ssh_client.connect(
@@ -103,7 +104,8 @@ class VyattaRouter:
                         port=self.port,
                         timeout=10,
                         look_for_keys=False,
-                        allow_agent=False
+                        allow_agent=False,
+                        disabled_algorithms=_legacy_algos
                     )
                 else:
                     self.ssh_client.connect(
@@ -112,7 +114,8 @@ class VyattaRouter:
                         port=self.port,
                         timeout=10,
                         look_for_keys=True,
-                        allow_agent=True
+                        allow_agent=True,
+                        disabled_algorithms=_legacy_algos
                     )
                 
                 self.sftp_client = self.ssh_client.open_sftp()

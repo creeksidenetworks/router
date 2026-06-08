@@ -1,0 +1,50 @@
+#
+# FreeRADIUS users file — IKEv2 VPN with class-group IP pools
+#
+# strongSwan's eap-radius plugin reads the RADIUS 'Class' attribute returned
+# in the Access-Accept and maps it to an ipsec.conf connection via rightgroups.
+# This gives each user class its own IP address pool.
+#
+# Pool layout (matches default setup.py output):
+#   class_a  →  192.168.88.0/24  (rightsourceip = 192.168.88.1/24)
+#   class_b  →  192.168.89.0/24  (rightsourceip = 192.168.89.1/24)
+#   fallback →  users not in any group get the fallback connection's pool
+#
+# Install this file at:
+#   FreeRADIUS v3: /etc/freeradius/3.0/users
+#   FreeRADIUS v2: /etc/freeradius/users
+#
+# After editing, reload FreeRADIUS:
+#   sudo systemctl reload freeradius
+#   sudo freeradius -X   (debug mode to verify)
+#
+# Test with radtest (installed via freeradius-utils):
+#   radtest alice password_alice 127.0.0.1 0 testing123
+#
+
+# ─── Class A users — routed to 192.168.88.0/24 ────────────────────────────────
+
+alice           Cleartext-Password := "password_alice"
+                Class := "class_a",
+                Reply-Message := "Welcome, Alice"
+
+bob             Cleartext-Password := "password_bob"
+                Class := "class_a",
+                Reply-Message := "Welcome, Bob"
+
+# ─── Class B users — routed to 192.168.89.0/24 ────────────────────────────────
+
+charlie         Cleartext-Password := "password_charlie"
+                Class := "class_b",
+                Reply-Message := "Welcome, Charlie"
+
+diana           Cleartext-Password := "password_diana"
+                Class := "class_b",
+                Reply-Message := "Welcome, Diana"
+
+# ─── Users without a class — routed to fallback connection pool ───────────────
+#
+# Omit the Class attribute entirely; strongSwan will use the fallback connection.
+
+guest           Cleartext-Password := "password_guest"
+                Reply-Message := "Welcome, Guest"

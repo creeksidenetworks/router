@@ -66,8 +66,8 @@ echo ""
 echo "To deactivate, run:"
 echo "  deactivate"
 echo ""
-echo "To run the router script directly:"
-echo "  ${VENV_DIR}/bin/python router.py <hostname> [options]"
+echo "To run the setup script directly:"
+echo "  ${VENV_DIR}/bin/python setup.py <hostname> [options]"
 echo ""
 
 # Optionally activate the environment

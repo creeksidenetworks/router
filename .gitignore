@@ -72,4 +72,4 @@ ssl/ca/
 
 # Sensitive configuration files
 default.conf
-gfw/sdw-keys.txt
+**/sdw-keys.txt

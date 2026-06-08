@@ -55,7 +55,7 @@ conn %default
     right=%any
     rightid=%any
     rightsendcert=never
-    rightauth=eap-mschapv2
+    rightauth=eap-radius
     rightdns=8.8.8.8
     eap_identity=%identity
 

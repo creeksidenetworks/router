@@ -249,53 +249,91 @@ def is_valid_email(email):
 
 # local CA certificate management & VPN server certificate generation
 def gen_certs_from_local_ca(ca_base_path, vpn_cert_path, router=None):
-    # read existing CAs
-    ca_directories = [" "]
-    i=1
-    options =[ 
-        "[0] Return to the main menu", 
-    ]
+    router_ca_cert_path = f"{ROUTER_IPSEC_ROOT}/cacerts/ca.crt"
+    router_ca_key_path  = f"{ROUTER_IPSEC_ROOT}/cacerts/ca.key"
+    cert_manager = None
+    ca_key_on_router = False
 
-    # Check for existing CA directories
-    for d in os.listdir(ca_base_path):
-        if os.path.isdir(os.path.join(ca_base_path, d)):
-            options.append(f"[{i}] "+ d)
-            ca_directories.append(d)
-            i += 1
+    # If the router already has a CA key, download and reuse it — no menu needed
+    if router is not None:
+        try:
+            router.sftp_client.stat(router_ca_key_path)
+            ca_key_on_router = True
+        except Exception:
+            pass
 
-    options.append("-----------------------------")  # Separation line
-    options.append(f"[{i}] Create a new CA (self-signed)")
+        if ca_key_on_router:
+            print_step("", "Reusing Existing CA from Router")
+            tmp_key = "/tmp/.ca_key_tmp"
+            router.run_os_cmd(
+                f"sudo cp {router_ca_key_path} {tmp_key} && sudo chmod 644 {tmp_key}",
+                echo=False
+            )
+            ca_key_content  = router.download(tmp_key)
+            router.run_os_cmd(f"sudo rm -f {tmp_key}", echo=False)
+            ca_cert_content = router.download(router_ca_cert_path)
 
-    ca_menu = TerminalMenu(options, title="Choose a CA")
-    ca_index = ca_menu.show()
+            if ca_key_content and ca_cert_content:
+                ca_name = "router_ca"
+                ca_path = os.path.join(ca_base_path, ca_name)
+                os.makedirs(ca_path, exist_ok=True)
+                with open(os.path.join(ca_path, "ca.key"), "w") as f:
+                    f.write(ca_key_content)
+                with open(os.path.join(ca_path, "ca.crt"), "w") as f:
+                    f.write(ca_cert_content)
+                cert_manager = CertManager(ca_name, ca_path, vpn_cert_path)
+                print_ok(f"Router CA cached locally at {ca_path}")
+            else:
+                print_warn("Could not download CA from router — falling back to local CA selection")
 
-    if ca_index == 0:
-        return
-    elif ca_index == i+1:
-        print_step("", "Create New Self-Signed CA")
-        ca_name         = input(f"  CA name [{Colors.GREEN}Creekside_CA{Colors.RESET}]: ") or "Creekside_CA"
-        country         = input(f"  Country [{Colors.GREEN}US{Colors.RESET}]: ") or "US"
-        state           = input(f"  State/Province [{Colors.GREEN}California{Colors.RESET}]: ") or "California"
-        locality        = input(f"  Locality [{Colors.GREEN}San Jose{Colors.RESET}]: ") or "San Jose"
-        organization    = input(f"  Organization [{Colors.GREEN}Creekside Networks LLC.{Colors.RESET}]: ") or "Creekside Networks LLC."
-        common_name     = input(f"  Common Name [{Colors.GREEN}VPN CA{Colors.RESET}]: ") or "VPN CA"
+    if cert_manager is None:
+        # read existing CAs
+        ca_directories = [" "]
+        i=1
+        options =[
+            "[0] Return to the main menu",
+        ]
 
-        ca_path = os.path.join(ca_base_path, ca_name)
-        cert_manager = CertManager(ca_name, ca_path, vpn_cert_path)
-        cert_manager.create_self_signed_ca(country, state, locality, organization, common_name)
-    else:
-        selected_ca = ca_directories[ca_index]
-        print_ok(f"Existing CA \"{selected_ca}\" selected")
-        ca_path = os.path.join(ca_base_path, selected_ca)
-        ca_cert_path = os.path.join(ca_path, "ca.crt")
-        ca_key_path = os.path.join(ca_path, "ca.key")
+        # Check for existing CA directories
+        for d in os.listdir(ca_base_path):
+            if os.path.isdir(os.path.join(ca_base_path, d)):
+                options.append(f"[{i}] "+ d)
+                ca_directories.append(d)
+                i += 1
 
-        if not os.path.exists(ca_cert_path) or not os.path.exists(ca_key_path):
-            print_error(f"CA files not found in {ca_path}")
+        options.append("-----------------------------")  # Separation line
+        options.append(f"[{i}] Create a new CA (self-signed)")
+
+        ca_menu = TerminalMenu(options, title="Choose a CA")
+        ca_index = ca_menu.show()
+
+        if ca_index == 0:
             return
+        elif ca_index == i+1:
+            print_step("", "Create New Self-Signed CA")
+            ca_name         = input(f"  CA name [{Colors.GREEN}Creekside_CA{Colors.RESET}]: ") or "Creekside_CA"
+            country         = input(f"  Country [{Colors.GREEN}US{Colors.RESET}]: ") or "US"
+            state           = input(f"  State/Province [{Colors.GREEN}California{Colors.RESET}]: ") or "California"
+            locality        = input(f"  Locality [{Colors.GREEN}San Jose{Colors.RESET}]: ") or "San Jose"
+            organization    = input(f"  Organization [{Colors.GREEN}Creekside Networks LLC.{Colors.RESET}]: ") or "Creekside Networks LLC."
+            common_name     = input(f"  Common Name [{Colors.GREEN}VPN CA{Colors.RESET}]: ") or "VPN CA"
 
-        cert_manager = CertManager(selected_ca, ca_path, vpn_cert_path)
-        cert_manager.load_existing_ca(ca_cert_path, ca_key_path)
+            ca_path = os.path.join(ca_base_path, ca_name)
+            cert_manager = CertManager(ca_name, ca_path, vpn_cert_path)
+            cert_manager.create_self_signed_ca(country, state, locality, organization, common_name)
+        else:
+            selected_ca = ca_directories[ca_index]
+            print_ok(f"Existing CA \"{selected_ca}\" selected")
+            ca_path = os.path.join(ca_base_path, selected_ca)
+            ca_cert_path = os.path.join(ca_path, "ca.crt")
+            ca_key_path = os.path.join(ca_path, "ca.key")
+
+            if not os.path.exists(ca_cert_path) or not os.path.exists(ca_key_path):
+                print_error(f"CA files not found in {ca_path}")
+                return
+
+            cert_manager = CertManager(selected_ca, ca_path, vpn_cert_path)
+            cert_manager.load_existing_ca(ca_cert_path, ca_key_path)
 
     # Get default VPN server name from DDNS or hostname
     default_vpn_name = "vpn.example.com"
@@ -349,43 +387,63 @@ def gen_certs_from_local_ca(ca_base_path, vpn_cert_path, router=None):
     server_cert_path = os.path.join(server_cert_root, "server.crt")
     server_pub_path  = os.path.join(server_cert_root, "server.pub")
 
+    router_rsakey_path = f"{ROUTER_IPSEC_ROOT}/rsa-keys/localhost.key"
+    router_rsapub_path = f"{ROUTER_IPSEC_ROOT}/rsa-keys/localhost.pub"
+
     if router is not None:
-        # Check if the localhost.key file exists on the remote router
-        router_rsakey_path = f"{ROUTER_IPSEC_ROOT}/rsa-keys/localhost.key"
+        # Check if localhost.key exists (may be root-owned — use sftp.stat on directory-accessible path)
+        key_exists = False
         try:
-            sftp = router.sftp_client
-            sftp.stat(router_rsakey_path)
+            router.sftp_client.stat(router_rsakey_path)
             key_exists = True
-        except FileNotFoundError:
+        except Exception:
             key_exists = False
 
         if key_exists:
-            # Download the existing localhost.key file
-            router.download_file(router_rsakey_path, server_key_path, echo=True)
-            print_ok(f"Found existing localhost.key on router, downloaded to {server_key_path}")
+            # localhost.key is root:root 600 — copy to temp with readable perms, download, clean up
+            print_step("", "Using Existing Router RSA Key")
+            tmp_key = "/tmp/.ipsec_rsa_key_tmp"
+            router.run_os_cmd(
+                f"sudo cp {router_rsakey_path} {tmp_key} && sudo chmod 644 {tmp_key}",
+                echo=False
+            )
+            key_content = router.download(tmp_key)
+            router.run_os_cmd(f"sudo rm -f {tmp_key}", echo=False)
 
-    # Issue the VPN server certificate
+            if key_content:
+                os.makedirs(os.path.dirname(server_key_path), exist_ok=True)
+                with open(server_key_path, "w") as f:
+                    f.write(key_content)
+                print_ok(f"Router localhost.key downloaded to {server_key_path}")
+            else:
+                print_warn("Could not read localhost.key — generating a new key instead")
+                key_exists = False
+        else:
+            print_info("No localhost.key found — a new RSA key will be generated and uploaded")
+
+    # Issue the VPN server certificate (uses server_key_path if it exists locally)
     cert, key = cert_manager.issue_vpn_server_cert(server_name, dns_names, country, state, locality, organization)
 
     if router is not None:
-        # Upload the files to the remote router
         try:
-            # Upload ca.crt
-            router.upload(cert_manager.ca_cert_path, f"{ROUTER_IPSEC_ROOT}/cacerts/ca.crt", permission="0644")
+            # Upload CA certificate and key (key stored at 600 for future cert re-issuance)
+            router.upload(cert_manager.ca_cert_path, router_ca_cert_path, permission="0644")
+            if not ca_key_on_router:
+                router.upload(cert_manager.ca_key_path, router_ca_key_path, permission="0600")
+                print_ok("CA key uploaded to cacerts/ca.key")
 
-            # Upload server.crt and server.key
+            # Upload server certificate (key stays in rsa-keys/, NOT duplicated to certs/)
             router.upload(server_cert_path, f"{ROUTER_IPSEC_ROOT}/certs/server.crt", permission="0644")
-            router.upload(server_key_path, f"{ROUTER_IPSEC_ROOT}/certs/server.key", permission="0600")
 
-
-            # Upload server.key to localhost.key if it does not exist
+            # Upload key to rsa-keys/localhost.key only if it wasn't already there
             if not key_exists:
                 router.upload(server_key_path, router_rsakey_path, permission="0600")
+                print_ok("New RSA key uploaded to rsa-keys/localhost.key")
 
-            # Upload server.pub
-            router.upload(server_pub_path, f"{ROUTER_IPSEC_ROOT}/rsa-keys/localhost.pub", permission="0644")
+            # Always regenerate and upload the RFC3110 public key
+            router.upload(server_pub_path, router_rsapub_path, permission="0644")
 
-            print_ok("VPN certificates generated and uploaded successfully")
+            print_ok("VPN certificates uploaded — CA: cacerts/ca.key+ca.crt, cert: certs/server.crt")
         except Exception as e:
             print_error(f"Failed to upload VPN certificates: {e}")
 
