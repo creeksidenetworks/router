@@ -1,0 +1,8 @@
+#!/bin/bash
+# password generate tools
+
+admin_password=$(cat /dev/urandom | LC_ALL=C tr -dc 'A-Z' | fold -w 1 | sed 1q)
+admin_password=${admin_password}$(cat /dev/urandom | LC_ALL=C tr -dc 'a-z' | fold -w 3 | sed 1q)
+admin_password=${admin_password}$(cat /dev/urandom | LC_ALL=C tr -dc '0-9' | fold -w 5 | sed 1q)
+
+echo $admin_password
