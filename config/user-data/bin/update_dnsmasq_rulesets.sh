@@ -11,6 +11,9 @@ export PATH="/usr/sbin:/usr/bin:/sbin:/bin"
 LOG_FILE="/var/log/gfw.log"
 LOG_CAT="gfw"
 IPSET_NAME=LIBERTY_ADDRESS_GRP
+# Optional IPv6 twin of IPSET_NAME (hash:ip family inet6), set with -6.
+# dnsmasq puts A records into IPSET_NAME and AAAA records into IPSET6_NAME.
+IPSET6_NAME=""
 DNS_IP=8.8.8.8
 DNS_PORT=53
 CUSTOM_URL="https://raw.githubusercontent.com/creeksidenetworks/gfw/refs/heads/main/dnsmasq/dnsmasq_gfw_custom.conf"
@@ -67,9 +70,17 @@ clean_and_exit(){
     exit $1
 }
 
+# Append the IPv6 ipset to every "ipset=/.../$IPSET_NAME" line of a dnsmasq conf file
+add_ipset6() {
+    local conf_file=$1
+
+    [ -z "$IPSET6_NAME" ] && return 0
+    sudo sed -i -r 's#^(ipset=/.*/'$IPSET_NAME')[[:space:]]*$#\1,'$IPSET6_NAME'#' "$conf_file"
+}
+
 # Function to parse command line arguments
 parse_args() {
-    while getopts ":o:c:" opt; do
+    while getopts ":o:c:6:" opt; do
         case $opt in
             o)
                 CONF_PATH="$OPTARG"
@@ -77,8 +88,11 @@ parse_args() {
             c)
                 CUSTOM_URL="$OPTARG"
                 ;;
+            6)
+                IPSET6_NAME="$OPTARG"
+                ;;
             \?)
-                echo "Usage: $0 [-o <output path>] [-c <gfw-custom-url>]"
+                echo "Usage: $0 [-o <output path>] [-c <gfw-custom-url>] [-6 <ipv6 ipset name>]"
                 exit 1
                 ;;
         esac
@@ -162,11 +176,13 @@ ipset=/\1/'$IPSET_NAME'#g' > $CONF_TMP_FILE
     cat $CONF_TMP_FILE >> $OUT_TMP_FILE
     sudo cp $OUT_TMP_FILE $OUT_FILE
     sudo chmod 755 $OUT_FILE
+    add_ipset6 "$OUT_FILE"
     #printf '\nConverting GfwList to '$OUT_TYPE'... ' && echo 'Done\n\n'
 
     # Download custom dnsmasq-ipset rules
     echo "Downloading custom dnsmasq-ipset rules from: $CUSTOM_URL"
     download_file "$CUSTOM_URL" "${CONF_PATH}/dnsmasq_gfw_custom.conf"
+    add_ipset6 "${CONF_PATH}/dnsmasq_gfw_custom.conf"
 
     # Download custom dnsmasq-ipset rules
     echo "Downloading China dnsmasq-ipset rules from: $CHINA_URL"
